@@ -2,15 +2,31 @@ import config
 import requests
 import re
 import sqlite3
+import datetime as dt
 
-def insert_in_db(chat_id, category, digit, commentary=''):
+def create_db():
     db = sqlite3.connect('budget.db')
     c = db.cursor()
-    c.execute("CREATE TABLE IF NOT EXISTS balance (id_chat INTEGER, category TEXT, value FLOAT, commentary TEXT)")
-    c.execute("INSERT INTO balance VALUES ({}, '{}',{},'{}')".format(chat_id, category, digit, commentary))
-    c.execute("SELECT * FROM balance")
-    print(c.fetchall())
+    c.execute("CREATE TABLE IF NOT EXISTS balance (id_chat INTEGER, category TEXT, value FLOAT, commentary TEXT, date TEXT)")
     db.commit()
+    db.close()
+
+
+def insert_in_db(chat_id, category, digit, commentary=''):
+    year = dt.datetime.now().year
+    month = dt.datetime.now().month
+    day = dt.datetime.now().day
+    date = f'{year}-{month}-{day}'
+    try:
+        db = sqlite3.connect('budget.db')
+        c = db.cursor()
+        c.execute("CREATE TABLE IF NOT EXISTS balance (id_chat INTEGER, category TEXT, value FLOAT, commentary TEXT, date TEXT)")
+        c.execute("INSERT INTO balance VALUES ({}, '{}', {}, '{}', '{}')".format(chat_id, category, digit, commentary, date))
+        c.execute("SELECT * FROM balance")
+        db.commit()
+        send_message(chat_id, 'Добавил')
+    except:
+        send_message(chat_id, 'Что-то пошло не так...')
     db.close()
 
 def check_in_db(last_update_id):
@@ -48,7 +64,22 @@ def send_message(chat_id, text):
     url = f'https://api.telegram.org/bot{config.TOKEN}/sendMessage?chat_id={chat_id}&text={text}'
     r = requests.get(url)
 
+def spending_per_month(chat_id):
+    create_db()
+    year = dt.datetime.now().year
+    month = dt.datetime.now().month
+    db = sqlite3.connect('budget.db')
+    c = db.cursor()
+    c.execute("SELECT value FROM balance WHERE date >= '{}-{}-1'".format(year, month))
+    total = 0
+    for i in c.fetchall():
+        total += i[0]
+    send_message(chat_id, f'Всего в этом месяце потрачено: {round(total, 2)} гривен')
+
+
 def parse_message(chat_id, message):
+    if message == '/month':
+        return spending_per_month(chat_id)
     pattern_find_digit = r'[-+]?\d*[.,]\d+|\d+'
     pattern_find_category = r'\d\s([а-яА-Я]+)\s*'
     pattern_find_commentary = r'\"(.+)\"'
@@ -60,7 +91,7 @@ def parse_message(chat_id, message):
     else:
         commentary = commentary.group(1)
     if digit and category:
-        insert_in_db(chat_id, category.group(1), digit.group(), commentary)
+        insert_in_db(chat_id, category.group(1), digit.group().replace(',','.'), commentary)
     else:
         send_message(chat_id, 'Вы пишите какую-то ерунду!')
 
