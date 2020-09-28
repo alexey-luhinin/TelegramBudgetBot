@@ -8,6 +8,7 @@ def create_db():
     db = sqlite3.connect('budget.db')
     c = db.cursor()
     c.execute("CREATE TABLE IF NOT EXISTS balance (id_chat INTEGER, category TEXT, value FLOAT, commentary TEXT, date TEXT)")
+    c.execute("CREATE TABLE IF NOT EXISTS category (id_chat INTEGER, category TEXT)")
     db.commit()
     db.close()
 
@@ -57,11 +58,25 @@ def get_updates():
     last_update_id = data['result'][-1]['update_id']
     if check_in_db(last_update_id):
         return None
-    return chat_id, last_update_id, message
+    return chat_id, message
 
 
 def send_message(chat_id, text):
     url = f'https://api.telegram.org/bot{config.TOKEN}/sendMessage?chat_id={chat_id}&text={text}'
+    r = requests.get(url)
+
+def send_message_with_categories(chat_id, text):
+    create_db()
+    create_defaul_categories(chat_id)
+    category = set()
+    db = sqlite3.connect('budget.db')
+    c = db.cursor()
+    c.execute("SELECT category FROM category")
+    for i in c.fetchall():
+        category.add('["{}"]'.format(i[0]))
+    ct = str(category)[1:-1].replace('\'', '')
+    reply_markup = '{"keyboard":[' + ct + '  ,["Отмена"]],"one_time_keyboard":true,"resize_keyboard":true}'
+    url = f'https://api.telegram.org/bot{config.TOKEN}/sendMessage?chat_id={chat_id}&text={text}&reply_markup={reply_markup}'
     r = requests.get(url)
 
 def spending_per_month(chat_id):
@@ -76,28 +91,75 @@ def spending_per_month(chat_id):
         total += i[0]
     send_message(chat_id, f'Всего в этом месяце потрачено: {round(total, 2)} гривен')
 
+def add_new_category(chat_id, category):
+    create_db()
+    db = sqlite3.connect('budget.db')
+    c = db.cursor()
+    c.execute("INSERT INTO category VALUES ({}, '{}')".format(chat_id, category))
+    db.commit()
+    c.execute("SELECT category FROM category")
+    send_message(chat_id, 'Готово')
+    db.close()
+
+
+def create_defaul_categories(chat_id):
+    categories = ['Аренда', 'Машина', 'АЗС', 'Кошка', 'Продукты', 'Интернет','Рынок','Кафе','Досуг','Путешествия', 'Аптека', 'Доход',]
+    create_db()
+    db = sqlite3.connect('budget.db')
+    c = db.cursor()
+    for category in categories:
+        c.execute("SELECT category FROM category")
+        cat_list = []
+        for i in c.fetchall():
+            if category == i[0]:
+                cat_list.append(category)
+        if category not in cat_list:
+            c.execute("INSERT INTO category VALUES ({}, '{}')".format(chat_id, category))
+    db.commit()
+    db.close()
+
+
 
 def parse_message(chat_id, message):
     if message == '/month':
         return spending_per_month(chat_id)
+    if message == '/new_category':
+        send_message(chat_id, 'Введите название категории: ')
+        updates = get_updates()
+        while(not updates):
+            updates = get_updates()
+        else:
+            chat_id, category = updates
+        if category:
+            return add_new_category(chat_id, category)
     pattern_find_digit = r'[-+]?\d*[.,]\d+|\d+'
-    pattern_find_category = r'\d\s([а-яА-Я]+)\s*'
-    pattern_find_commentary = r'\"(.+)\"'
     digit = re.search(pattern_find_digit, message)
-    category = re.search(pattern_find_category, message) 
-    commentary = re.search(pattern_find_commentary, message)
-    if not commentary:
-        commentary = ''
-    else:
-        commentary = commentary.group(1)
-    if digit and category:
-        insert_in_db(chat_id, category.group(1), digit.group().replace(',','.'), commentary)
-    else:
-        send_message(chat_id, 'Вы пишите какую-то ерунду!')
+    if digit:
+        send_message_with_categories(chat_id, 'Выберите категорию: ')
+        updates = get_updates()
+        while(not updates):
+            updates = get_updates()
+        else:
+            chat_id, category = updates
+        if category and category!='Отмена':
+            insert_in_db(chat_id, category, digit.group().replace(',','.'))
+            
+
+    # pattern_find_category = r'\d\s([а-яА-Я]+)\s*'
+    # pattern_find_commentary = r'\"(.+)\"'
+    # category = re.search(pattern_find_category, message) 
+    # commentary = re.search(pattern_find_commentary, message)
+    # if not commentary:
+    #     commentary = ''
+    # else:
+    #     commentary = commentary.group(1)
+    # if digit and category:
+    # else:
+    #     send_message(chat_id, 'Вы пишите какую-то ерунду!')
 
 if __name__ == '__main__':
     while(True):
         message_from_user = get_updates()
         if message_from_user:
-           chat_id, last_update_id, message = message_from_user 
+           chat_id, message = message_from_user 
            parse_message(chat_id, message)
