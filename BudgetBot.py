@@ -66,6 +66,11 @@ def send_message(chat_id, text):
     url = f'https://api.telegram.org/bot{config.TOKEN}/sendMessage?chat_id={chat_id}&text={text}'
     r = requests.get(url)
 
+def send_message_with_cancel(chat_id, text):
+    reply_markup = '{"keyboard":[["Отмена"]],"one_time_keyboard":true,"resize_keyboard":true}'
+    url = f'https://api.telegram.org/bot{config.TOKEN}/sendMessage?chat_id={chat_id}&text={text}&reply_markup={reply_markup}'
+    r = requests.get(url)
+
 def send_message_with_categories(chat_id, text):
     create_db()
     create_defaul_categories(chat_id)
@@ -128,13 +133,13 @@ def parse_message(chat_id, message):
     if message == '/month':
         return spending_per_month(chat_id)
     if message == '/new_category':
-        send_message(chat_id, 'Введите название категории: ')
+        send_message_with_cancel(chat_id, 'Введите название категории: ')
         updates = get_updates()
         while(not updates):
             updates = get_updates()
         else:
             chat_id, category = updates
-        if category:
+        if category and category != 'Отмена':
             return add_new_category(chat_id, category)
     pattern_find_digit = r'[-+]?\d*[.,]\d+|\d+'
     digit = re.search(pattern_find_digit, message)
@@ -145,7 +150,7 @@ def parse_message(chat_id, message):
             updates = get_updates()
         else:
             chat_id, category = updates
-        if category and category!='Отмена':
+        if category and category != 'Отмена':
             insert_in_db(chat_id, category, digit.group().replace(',','.'))
             
 
