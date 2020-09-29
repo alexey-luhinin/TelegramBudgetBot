@@ -3,6 +3,7 @@ import requests
 import re
 import sqlite3
 import datetime as dt
+from numpy import array_split
 
 def create_db():
     db = sqlite3.connect('budget.db')
@@ -72,10 +73,13 @@ def send_message_with_categories(chat_id, text):
     db = sqlite3.connect('budget.db')
     c = db.cursor()
     c.execute("SELECT category FROM category")
+    cta = ''
     for i in c.fetchall():
-        category.add('["{}"]'.format(i[0]))
-    ct = str(category)[1:-1].replace('\'', '')
-    reply_markup = '{"keyboard":[' + ct + '  ,["Отмена"]],"one_time_keyboard":true,"resize_keyboard":true}'
+        category.add('"{}"'.format(i[0]))
+    ar = array_split(list(category), len(category) // 3)
+    for i in ar:
+        cta += str(list(i)).replace('\'', '') + ', '
+    reply_markup = '{"keyboard":[' + cta + '  ["Отмена"]],"one_time_keyboard":true,"resize_keyboard":true}'
     url = f'https://api.telegram.org/bot{config.TOKEN}/sendMessage?chat_id={chat_id}&text={text}&reply_markup={reply_markup}'
     r = requests.get(url)
 
