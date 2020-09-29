@@ -171,4 +171,7 @@ if __name__ == '__main__':
         message_from_user = get_updates()
         if message_from_user:
            chat_id, message = message_from_user 
-           parse_message(chat_id, message)
+           if chat_id in config.IDS:
+               parse_message(chat_id, message)
+           else: 
+               send_message('Это приватный бот')
