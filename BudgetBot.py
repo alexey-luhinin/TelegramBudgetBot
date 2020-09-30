@@ -24,7 +24,6 @@ def insert_in_db(chat_id, category, digit, commentary=''):
         c = db.cursor()
         c.execute("CREATE TABLE IF NOT EXISTS balance (id_chat INTEGER, category TEXT, value FLOAT, commentary TEXT, date TEXT)")
         c.execute("INSERT INTO balance VALUES ({}, '{}', {}, '{}', '{}')".format(chat_id, category, digit, commentary, date))
-        c.execute("SELECT * FROM balance")
         db.commit()
         send_message(chat_id, 'Добавил')
     except:
@@ -162,6 +161,8 @@ def parse_message(chat_id, message):
             chat_id, category = updates
         if category and category != 'Отмена':
             return add_new_category(chat_id, category)
+        else:
+            return
     pattern_find_digit = r'[-+]?\d*[.,]\d+|\d+'
     digit = re.search(pattern_find_digit, message)
     if digit:
