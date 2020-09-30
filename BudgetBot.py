@@ -49,9 +49,17 @@ def check_in_db(last_update_id):
     db.close()
     return False
 
+def get_last_update_id():
+    url = f'https://api.telegram.org/bot{config.TOKEN}/getUpdates'
+    r = requests.get(url)
+    data = r.json()
+    last_update_id = data['result'][-1]['update_id']
+    return last_update_id
+
 
 def get_updates():
-    url = f'https://api.telegram.org/bot{config.TOKEN}/getUpdates'
+    last_id = get_last_update_id()
+    url = f'https://api.telegram.org/bot{config.TOKEN}/getUpdates?offset={last_id}'
     r = requests.get(url)
     data = r.json()
     chat_id = data['result'][-1]['message']['chat']['id']
@@ -106,8 +114,19 @@ def add_new_category(chat_id, category):
     c = db.cursor()
     c.execute("INSERT INTO category VALUES ({}, '{}')".format(chat_id, category))
     db.commit()
-    c.execute("SELECT category FROM category")
     send_message(chat_id, 'Готово')
+    db.close()
+
+def del_category(chat_id):
+    create_db()
+    create_defaul_categories(chat_id)
+    db = sqlite3.connect('budget.db')
+    c = db.cursor()
+    c.execute("SELECT category FROM category")
+    last_cat = c.fetchall()[-1][0]
+    c.execute("DELETE FROM category WHERE category='{}'".format(last_cat))
+    db.commit()
+    send_message(chat_id, 'Удалил')
     db.close()
 
 
@@ -132,6 +151,8 @@ def create_defaul_categories(chat_id):
 def parse_message(chat_id, message):
     if message == '/month':
         return spending_per_month(chat_id)
+    if message == '/delete_category':
+        return del_category(chat_id)
     if message == '/new_category':
         send_message_with_cancel(chat_id, 'Введите название категории: ')
         updates = get_updates()
