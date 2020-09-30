@@ -173,6 +173,8 @@ def parse_message(chat_id, message):
             chat_id, category = updates
         if category and category != 'Отмена':
             insert_in_db(chat_id, category, digit.group().replace(',','.'))
+    else:
+        send_message(chat_id, 'Вы пишите какую-то ерунду!')
             
 
     # pattern_find_category = r'\d\s([а-яА-Я]+)\s*'
@@ -195,4 +197,4 @@ if __name__ == '__main__':
            if chat_id in config.IDS:
                parse_message(chat_id, message)
            else: 
-               send_message('Это приватный бот')
+               send_message(chat_id, 'Это приватный бот')
