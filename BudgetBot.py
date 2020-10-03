@@ -5,6 +5,7 @@ import sqlite3
 import datetime as dt
 from numpy import array_split
 
+
 def create_db():
     db = sqlite3.connect('budget.db')
     c = db.cursor()
@@ -22,13 +23,16 @@ def insert_in_db(chat_id, category, digit, commentary=''):
     try:
         db = sqlite3.connect('budget.db')
         c = db.cursor()
-        c.execute("CREATE TABLE IF NOT EXISTS balance (id_chat INTEGER, category TEXT, value FLOAT, commentary TEXT, date TEXT)")
-        c.execute("INSERT INTO balance VALUES ({}, '{}', {}, '{}', '{}')".format(chat_id, category, digit, commentary, date))
+        c.execute(
+            "CREATE TABLE IF NOT EXISTS balance (id_chat INTEGER, category TEXT, value FLOAT, commentary TEXT, date TEXT)")
+        c.execute("INSERT INTO balance VALUES ({}, '{}', {}, '{}', '{}')".format(
+            chat_id, category, digit, commentary, date))
         db.commit()
         send_message(chat_id, 'Добавил')
     except:
         send_message(chat_id, 'Что-то пошло не так...')
     db.close()
+
 
 def check_in_db(last_update_id):
     db = sqlite3.connect('budget.db')
@@ -47,6 +51,7 @@ def check_in_db(last_update_id):
     db.commit()
     db.close()
     return False
+
 
 def get_last_update_id():
     url = f'https://api.telegram.org/bot{config.TOKEN}/getUpdates'
@@ -73,10 +78,12 @@ def send_message(chat_id, text):
     url = f'https://api.telegram.org/bot{config.TOKEN}/sendMessage?chat_id={chat_id}&text={text}'
     r = requests.get(url)
 
+
 def send_message_with_cancel(chat_id, text):
     reply_markup = '{"keyboard":[["Отмена"]],"one_time_keyboard":true,"resize_keyboard":true}'
     url = f'https://api.telegram.org/bot{config.TOKEN}/sendMessage?chat_id={chat_id}&text={text}&reply_markup={reply_markup}'
     r = requests.get(url)
+
 
 def send_message_with_categories(chat_id, text):
     create_db()
@@ -91,9 +98,11 @@ def send_message_with_categories(chat_id, text):
     ar = array_split(list(category), len(category) // 3)
     for i in ar:
         cta += str(list(i)).replace('\'', '') + ', '
-    reply_markup = '{"keyboard":[' + cta + '  ["Отмена"]],"one_time_keyboard":true,"resize_keyboard":true}'
+    reply_markup = '{"keyboard":[' + cta + \
+        '  ["Отмена"]],"one_time_keyboard":true,"resize_keyboard":true}'
     url = f'https://api.telegram.org/bot{config.TOKEN}/sendMessage?chat_id={chat_id}&text={text}&reply_markup={reply_markup}'
     r = requests.get(url)
+
 
 def spending_per_month(chat_id):
     create_db()
@@ -101,11 +110,29 @@ def spending_per_month(chat_id):
     month = dt.datetime.now().month
     db = sqlite3.connect('budget.db')
     c = db.cursor()
-    c.execute("SELECT value FROM balance WHERE date >= '{}-{}-1'".format(year, month))
+    c.execute(
+        "SELECT value FROM balance WHERE date >= '{}-{}-1'".format(year, month))
     total = 0
     for i in c.fetchall():
         total += i[0]
-    send_message(chat_id, f'Всего в этом месяце потрачено: {round(total, 2)} гривен')
+    send_message(
+        chat_id, f'Всего в этом месяце потрачено: {round(total, 2)} гривен')
+
+def my_spending_per_month(chat_id):
+    create_db()
+    year = dt.datetime.now().year
+    month = dt.datetime.now().month
+    db = sqlite3.connect('budget.db')
+    c = db.cursor()
+    c.execute(
+        "SELECT value FROM balance WHERE date >= '{}-{}-1' AND id_chat == {} ".format(year, month, chat_id))
+    total = 0
+    for i in c.fetchall():
+        total += i[0]
+    send_message(
+        chat_id, f'Всего в этом месяце Вы потратили: {round(total, 2)} гривен')
+
+
 
 def add_new_category(chat_id, category):
     create_db()
@@ -115,6 +142,7 @@ def add_new_category(chat_id, category):
     db.commit()
     send_message(chat_id, 'Готово')
     db.close()
+
 
 def del_category(chat_id):
     create_db()
@@ -130,7 +158,8 @@ def del_category(chat_id):
 
 
 def create_defaul_categories(chat_id):
-    categories = ['Аренда', 'Машина', 'АЗС', 'Кошка', 'Продукты', 'Интернет','Рынок','Кафе','Досуг','Путешествия', 'Аптека', 'Доход',]
+    categories = ['Аренда', 'Машина', 'АЗС', 'Кошка', 'Продукты', 'Интернет',
+                  'Рынок', 'Кафе', 'Досуг', 'Путешествия', 'Аптека', 'Доход', ]
     create_db()
     db = sqlite3.connect('budget.db')
     c = db.cursor()
@@ -141,15 +170,38 @@ def create_defaul_categories(chat_id):
             if category == i[0]:
                 cat_list.append(category)
         if category not in cat_list:
-            c.execute("INSERT INTO category VALUES ({}, '{}')".format(chat_id, category))
+            c.execute("INSERT INTO category VALUES ({}, '{}')".format(
+                chat_id, category))
     db.commit()
     db.close()
 
+
+def last_month_spendings(chat_id):
+    db = sqlite3.connect('budget.db')
+    c = db.cursor()
+    year = dt.datetime.now().year
+    month = dt.datetime.now().month
+    c.execute("SELECT * FROM balance WHERE date >= '{}-{}-1'".format(year, month))
+    items = ''
+    for item in c.fetchall()[::-1]:
+        chat, cat, price, note, date = item
+        # items += f'{date}{price:>15}{cat:>15}{note:>25}\n\n'
+        items += f'{date}'.center(10)
+        items += f'{price}'.center(15)
+        items += f'{cat}'.center(20)
+        items += f'{note}'.center(25)
+        items += f'\n'
+    # print(items)
+    send_message(chat_id, items)
 
 
 def parse_message(chat_id, message):
     if message == '/month':
         return spending_per_month(chat_id)
+    if message == '/me_month':
+        return my_spending_per_month(chat_id)
+    if message == '/show_month':
+        return last_month_spendings(chat_id)
     if message == '/delete_category':
         return del_category(chat_id)
     if message == '/new_category':
@@ -173,14 +225,13 @@ def parse_message(chat_id, message):
         else:
             chat_id, category = updates
         if category and category != 'Отмена':
-            insert_in_db(chat_id, category, digit.group().replace(',','.'))
+            insert_in_db(chat_id, category, digit.group().replace(',', '.'))
     else:
         send_message(chat_id, 'Вы пишите какую-то ерунду!')
-            
 
     # pattern_find_category = r'\d\s([а-яА-Я]+)\s*'
     # pattern_find_commentary = r'\"(.+)\"'
-    # category = re.search(pattern_find_category, message) 
+    # category = re.search(pattern_find_category, message)
     # commentary = re.search(pattern_find_commentary, message)
     # if not commentary:
     #     commentary = ''
@@ -190,12 +241,13 @@ def parse_message(chat_id, message):
     # else:
     #     send_message(chat_id, 'Вы пишите какую-то ерунду!')
 
+
 if __name__ == '__main__':
     while(True):
         message_from_user = get_updates()
         if message_from_user:
-           chat_id, message = message_from_user 
-           if chat_id in config.IDS:
-               parse_message(chat_id, message)
-           else: 
-               send_message(chat_id, 'Это приватный бот')
+            chat_id, message = message_from_user
+            if chat_id in config.IDS:
+                parse_message(chat_id, message)
+            else:
+                send_message(chat_id, 'Это приватный бот')
