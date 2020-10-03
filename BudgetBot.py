@@ -225,7 +225,17 @@ def parse_message(chat_id, message):
         else:
             chat_id, category = updates
         if category and category != 'Отмена':
-            insert_in_db(chat_id, category, digit.group().replace(',', '.'))
+            send_message_with_cancel(chat_id, 'Возможно, вы желаете оставить заметку: ')
+            updates = get_updates()
+            while(not updates):
+                updates = get_updates()
+            else:
+                chat_id, note = updates
+            if note and note != 'Отмена':
+                commentary = note
+            else:
+                commentary = ''
+            insert_in_db(chat_id, category, digit.group().replace(',', '.'), commentary)
     else:
         send_message(chat_id, 'Вы пишите какую-то ерунду!')
 
