@@ -156,6 +156,17 @@ def del_category(chat_id):
     send_message(chat_id, 'Удалил')
     db.close()
 
+def del_last_item(chat_id):
+    create_db()
+    db = sqlite3.connect('budget.db')
+    c = db.cursor()
+    c.execute("SELECT * FROM balance")
+    last_item = c.fetchall()[-1]
+    c.execute("DELETE FROM balance WHERE id_chat={} AND category='{}' AND value={} AND commentary='{}' AND date='{}'".format(*last_item))
+    db.commit()
+    send_message(chat_id, 'Запись удалена')
+    db.close()
+
 
 def create_defaul_categories(chat_id):
     categories = ['Аренда', 'Машина', 'АЗС', 'Кошка', 'Продукты', 'Интернет',
@@ -204,6 +215,8 @@ def parse_message(chat_id, message):
         return last_month_spendings(chat_id)
     if message == '/delete_category':
         return del_category(chat_id)
+    if message == '/delete_item':
+        return del_last_item(chat_id)
     if message == '/new_category':
         send_message_with_cancel(chat_id, 'Введите название категории: ')
         updates = get_updates()
