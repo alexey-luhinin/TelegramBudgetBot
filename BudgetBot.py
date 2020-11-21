@@ -16,10 +16,7 @@ def create_db():
 
 
 def insert_in_db(chat_id, category, digit, commentary=''):
-    year = dt.datetime.now().year
-    month = dt.datetime.now().month
-    day = dt.datetime.now().day
-    date = f'{year}-{month}-{day}'
+    date = dt.datetime.now().strftime('%Y-%m-%d')
     try:
         db = sqlite3.connect('budget.db')
         c = db.cursor()
@@ -106,32 +103,44 @@ def send_message_with_categories(chat_id, text):
 
 def spending_per_month(chat_id):
     create_db()
-    year = dt.datetime.now().year
-    month = dt.datetime.now().month
+    year = dt.datetime.now().strftime('%Y')
+    month = dt.datetime.now().strftime('%m')
     db = sqlite3.connect('budget.db')
     c = db.cursor()
     c.execute(
-        "SELECT value FROM balance WHERE date >= '{}-{}-1'".format(year, month))
+        "SELECT value FROM balance WHERE date >= '{}-{}-01'".format(year, month))
     total = 0
     for i in c.fetchall():
         total += i[0]
     send_message(
         chat_id, f'Всего в этом месяце потрачено: {round(total, 2)} гривен')
 
+
 def my_spending_per_month(chat_id):
     create_db()
-    year = dt.datetime.now().year
-    month = dt.datetime.now().month
+    year = dt.datetime.now().strftime('%Y')
+    month = dt.datetime.now().strftime('%m')
     db = sqlite3.connect('budget.db')
     c = db.cursor()
     c.execute(
-        "SELECT value FROM balance WHERE date >= '{}-{}-1' AND id_chat == {} ".format(year, month, chat_id))
+        "SELECT value FROM balance WHERE date >= '{}-{}-01' AND id_chat == {} ".format(year, month, chat_id))
     total = 0
     for i in c.fetchall():
         total += i[0]
     send_message(
         chat_id, f'Всего в этом месяце Вы потратили: {round(total, 2)} гривен')
 
+
+def all_costs(chat_id):
+    create_db()
+    db = sqlite3.connect('budget.db')
+    c = db.cursor()
+    c.execute("SELECT value FROM balance")
+    total = 0
+    for i in c.fetchall():
+        total += i[0]
+    send_message(
+        chat_id, f'Всего потрачено: {round(total, 2)} гривен')
 
 
 def add_new_category(chat_id, category):
@@ -156,12 +165,14 @@ def del_category(chat_id):
     send_message(chat_id, 'Удалил')
     db.close()
 
+
 def del_last_item(chat_id):
     create_db()
     db = sqlite3.connect('budget.db')
     c = db.cursor()
     c.execute("SELECT * FROM balance")
     last_item = c.fetchall()[-1]
+    print(last_item)
     c.execute("DELETE FROM balance WHERE id_chat={} AND category='{}' AND value={} AND commentary='{}' AND date='{}'".format(*last_item))
     db.commit()
     send_message(chat_id, 'Запись удалена')
@@ -196,13 +207,28 @@ def last_month_spendings(chat_id):
     items = ''
     for item in c.fetchall()[::-1]:
         chat, cat, price, note, date = item
-        # items += f'{date}{price:>15}{cat:>15}{note:>25}\n\n'
         items += f'{date}'.center(10)
         items += f'{price}'.center(15)
         items += f'{cat}'.center(20)
         items += f'{note}'.center(25)
         items += f'\n'
-    # print(items)
+
+    send_message(chat_id, items)
+
+
+def show_all_costs(chat_id):
+    db = sqlite3.connect('budget.db')
+    c = db.cursor()
+    c.execute("SELECT * FROM balance")
+    items = ''
+    for item in c.fetchall()[::-1]:
+        chat, cat, price, note, date = item
+        items += f'{date}'.center(10)
+        items += f'{price}'.center(15)
+        items += f'{cat}'.center(20)
+        items += f'{note}'.center(25)
+        items += f'\n'
+
     send_message(chat_id, items)
 
 
@@ -211,8 +237,12 @@ def parse_message(chat_id, message):
         return spending_per_month(chat_id)
     if message == '/me_month':
         return my_spending_per_month(chat_id)
+    if message == '/all_costs':
+        return all_costs(chat_id)
     if message == '/show_month':
         return last_month_spendings(chat_id)
+    if message == '/show_all_costs':
+        return show_all_costs(chat_id)
     if message == '/delete_category':
         return del_category(chat_id)
     if message == '/delete_item':
@@ -251,18 +281,6 @@ def parse_message(chat_id, message):
             insert_in_db(chat_id, category, digit.group().replace(',', '.'), commentary)
     else:
         send_message(chat_id, 'Вы пишите какую-то ерунду!')
-
-    # pattern_find_category = r'\d\s([а-яА-Я]+)\s*'
-    # pattern_find_commentary = r'\"(.+)\"'
-    # category = re.search(pattern_find_category, message)
-    # commentary = re.search(pattern_find_commentary, message)
-    # if not commentary:
-    #     commentary = ''
-    # else:
-    #     commentary = commentary.group(1)
-    # if digit and category:
-    # else:
-    #     send_message(chat_id, 'Вы пишите какую-то ерунду!')
 
 
 if __name__ == '__main__':
